@@ -152,13 +152,21 @@ def patch_mouse_camera(source):
 # heading overrides stay intact; collision and the camera's position stay.
 CAM_FOLLOW_ANCHOR = "L_8064720c:;\nif (!c->z) { goto L_806492c4; }\n"
 CAM_FOLLOW_JOIN = "L_80645ad8:;"
-CAM_FOLLOW_HOOK = ("    if (hos_disable_camera_centering()) { c->x[25] = c->x[26]; goto L_80645ad8; }"
-                   "   /* (nx2/oot_patches.py: disable camera centering) */\n")
+CAM_FOLLOW_HOOK = (
+    "    /* (nx2/oot_patches.py: Disable camera centering, yaw.) The movement heading this path would\n"
+    "       derive is skipped, and x25 is put back to the parameter base the path would have set before\n"
+    "       joining the other yaw paths. Only the automatic follow is skipped: state 4's stick, an explicit\n"
+    "       recenter and authored headings still run. */\n"
+    "    if (hos_disable_camera_centering()) { c->x[25] = c->x[26]; goto L_80645ad8; }\n")
 CAM_PITCH_LOAD = "    { { uint64_t _v=recomp_load32(c,(c->x[19]+396ULL)); a64_vset64(c->vreg[0],_v); } }\n"
 CAM_PITCH_ANCHORS = ("L_80646934:;\n" + CAM_PITCH_LOAD, "L_80646ad4:;\n" + CAM_PITCH_LOAD)
 CAM_PITCH_JOIN = "L_80646c34:;"
-CAM_PITCH_HOOK = ("    if (hos_disable_camera_centering()) { goto L_80646c34; }"
-                  "   /* (nx2/oot_patches.py: keep the vertical camera centering) */\n")
+CAM_PITCH_HOOK = (
+    "    /* (nx2/oot_patches.py: Disable camera centering, pitch.) vreg0 holds the pitch (+0x18c) just\n"
+    "       loaded above. The rest of this path would ease it toward the movement follow target, and the\n"
+    "       common tail would then ease it back to rest; the final positioning uses the pitch as it is.\n"
+    "       Manual stick pitch, scripted cameras and collision still run. */\n"
+    "    if (hos_disable_camera_centering()) { goto L_80646c34; }\n")
 
 
 def patch_camera_centering(source):
