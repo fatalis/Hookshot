@@ -724,8 +724,8 @@ Row rows[] = {
     {TAB_CONTROLS, "Mouse camera", &opts.mouse_native, 0, 1, 1, tx_mousecam, "How the captured mouse turns the camera.",
      hn_mousecam, false, true},
     {TAB_CONTROLS, "Disable camera centering", &opts.disable_camera_centering, 0, 1, 1, tx_onoff,
-     "Stops the camera gradually turning toward the direction you move, useful with native mouse look. Off keeps the "
-     "game's standard behavior. Manual camera controls and recentering still work.", nullptr, false, true},
+     "Stops the camera gradually turning toward your movement and easing its pitch back to rest, useful with native "
+     "mouse look. Off keeps the game's standard behavior. Manual camera controls and recentering still work.", nullptr, false, true},
     {TAB_CONTROLS, "Mouse sensitivity", &opts.mouse_sens, 10, 500, 10, tx_sens,
      "How far the camera turns for a mouse movement, with either Mouse camera: at 1.00 native look turns 0.1 degree a "
      "count. The - and = keys change it in game too.", nullptr, false, true},

@@ -142,14 +142,23 @@ def patch_mouse_camera(source):
     return source.replace('#include "a64.h"\n', '#include "a64.h"\nextern void hos_mouse_camera(uint64_t camera);\n', 1)
 
 
-# The camera's state-3 yaw follow: after f_80642c80's authored heading override (the branch to 0x806492c4), the block at
-# 0x8064720c derives a heading from Link's movement and eases yaw (+0x1a4) through f_80642410 at 0x806475e4. Skip only
-# the movement path, restoring x25's parameter base as that path does, and join the other yaw paths at 0x80645ad8.
-# State 4's stick, state 2's explicit recenter and authored heading overrides stay intact; pitch and collision follow.
+# The camera's state-3 follow, horizontal and vertical: after f_80642c80's authored heading override (the branch to
+# 0x806492c4), the block at 0x8064720c derives a heading from Link's movement and eases yaw (+0x1a4) through
+# f_80642410 at 0x806475e4. The movement also eases pitch (+0x18c) toward the follow angle at 0x80646934 and
+# 0x80646ad4, and the common tail at 0x80646ba0 eases it back to rest (+0x190). With the option on, skip the yaw
+# derivation (restoring x25's parameter base as that path does, joining the other yaw paths at 0x80645ad8) and, after
+# each pitch path loads the angle into vreg0, join the final positioning at 0x80646c34. The pitch then stays where the
+# player put it, and the rest ease is skipped with it. State 4's stick, state 2's explicit recenter and authored
+# heading overrides stay intact; collision and the camera's position stay.
 CAM_FOLLOW_ANCHOR = "L_8064720c:;\nif (!c->z) { goto L_806492c4; }\n"
 CAM_FOLLOW_JOIN = "L_80645ad8:;"
 CAM_FOLLOW_HOOK = ("    if (hos_disable_camera_centering()) { c->x[25] = c->x[26]; goto L_80645ad8; }"
                    "   /* (nx2/oot_patches.py: disable camera centering) */\n")
+CAM_PITCH_LOAD = "    { { uint64_t _v=recomp_load32(c,(c->x[19]+396ULL)); a64_vset64(c->vreg[0],_v); } }\n"
+CAM_PITCH_ANCHORS = ("L_80646934:;\n" + CAM_PITCH_LOAD, "L_80646ad4:;\n" + CAM_PITCH_LOAD)
+CAM_PITCH_JOIN = "L_80646c34:;"
+CAM_PITCH_HOOK = ("    if (hos_disable_camera_centering()) { goto L_80646c34; }"
+                  "   /* (nx2/oot_patches.py: keep the vertical camera centering) */\n")
 
 
 def patch_camera_centering(source):
@@ -160,13 +169,22 @@ def patch_camera_centering(source):
     if end < 0:
         return None
     body = source[start:end]
-    if body.count(CAM_FOLLOW_ANCHOR) != 1 or body.count(CAM_FOLLOW_JOIN) != 1:
+    if (body.count(CAM_FOLLOW_ANCHOR) != 1 or body.count(CAM_FOLLOW_JOIN) != 1
+            or any(body.count(a) != 1 for a in CAM_PITCH_ANCHORS)
+            or body.count(CAM_PITCH_JOIN) != 1):
         return None
-    if CAM_FOLLOW_HOOK in body:
-        return source
-    body = body.replace(CAM_FOLLOW_ANCHOR, CAM_FOLLOW_ANCHOR + CAM_FOLLOW_HOOK, 1)
-    return (source[:start] + body + source[end:]).replace(
-        '#include "a64.h"\n', '#include "a64.h"\nextern int hos_disable_camera_centering(void);\n', 1)
+    if body.count(CAM_FOLLOW_HOOK) > 1 or body.count(CAM_PITCH_HOOK) not in (0, 2):
+        return None
+    if CAM_FOLLOW_HOOK not in body:
+        body = body.replace(CAM_FOLLOW_ANCHOR, CAM_FOLLOW_ANCHOR + CAM_FOLLOW_HOOK, 1)
+    if CAM_PITCH_HOOK not in body:
+        for anchor in CAM_PITCH_ANCHORS:
+            body = body.replace(anchor, anchor + CAM_PITCH_HOOK, 1)
+    out = source[:start] + body + source[end:]
+    if 'extern int hos_disable_camera_centering(void);' not in out:
+        out = out.replace('#include "a64.h"\n',
+                          '#include "a64.h"\nextern int hos_disable_camera_centering(void);\n', 1)
+    return out
 
 
 MENU_FOCUS_HEAD = "void f_802ed660(Ctx *__restrict A64_NOESC c) {\n"
